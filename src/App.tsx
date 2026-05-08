@@ -224,6 +224,11 @@ export default function App() {
   };
 
   const selectWorker = async (worker: Profile) => {
+    // Si no está logueado, redirigir al login
+    if (!user) {
+      setView('LOGIN');
+      return;
+    }
     setSelectedWorker(worker);
     setView('PROFILE');
     // Fetch reviews
@@ -257,6 +262,13 @@ export default function App() {
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `profiles/${user.uid}`, auth);
     }
+  };
+
+  // Helper: obtener nombre a mostrar según estado de login
+  const getDisplayName = (name: string) => {
+    if (user) return name;
+    // Solo mostrar el primer nombre si no está logueado
+    return name ? name.split(' ')[0] : name;
   };
 
   if (loading) {
@@ -455,7 +467,7 @@ export default function App() {
 
                       <div className="space-y-4">
                         <div>
-                          <h3 className="font-display font-bold text-xl text-brand-primary truncate">{worker.name}</h3>
+                          <h3 className="font-display font-bold text-xl text-brand-primary truncate">{getDisplayName(worker.name)}</h3>
                           <div className="flex items-center gap-1 text-slate-400 text-sm mt-0.5">
                             <MapPin size={14} />
                             <span>{worker.city}, {worker.department}</span>
