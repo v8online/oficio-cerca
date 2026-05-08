@@ -135,6 +135,10 @@ export default function App() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
+  // Edit Profile Local State
+  const [editDept, setEditDept] = useState('');
+  const [editCity, setEditCity] = useState('');
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -147,6 +151,13 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (profile && view === 'EDIT_PROFILE') {
+      setEditDept(profile.department || '');
+      setEditCity(profile.city || '');
+    }
+  }, [profile, view]);
 
   const fetchProfile = async (uid: string) => {
     try {
@@ -711,21 +722,31 @@ export default function App() {
                       <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Departamento</label>
                       <select 
                         name="department"
-                        defaultValue={profile.department}
+                        value={editDept}
+                        onChange={(e) => {
+                          setEditDept(e.target.value);
+                          setEditCity('');
+                        }}
+                        required
                         className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-sm"
                       >
-                        <option value="">Seleccionar...</option>
+                        <option value="">Seleccionar Departamento...</option>
                         {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Localidad</label>
-                      <input 
+                      <select 
                         name="city"
-                        defaultValue={profile.city}
-                        placeholder="Ej: Córdoba Capital"
-                        className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-sm"
-                      />
+                        value={editCity}
+                        onChange={(e) => setEditCity(e.target.value)}
+                        required
+                        disabled={!editDept}
+                        className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-sm disabled:opacity-50"
+                      >
+                        <option value="">Seleccionar Ciudad...</option>
+                        {editDept && CITIES_BY_DEPARTMENT[editDept]?.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
                     </div>
                   </div>
 
