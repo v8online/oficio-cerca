@@ -17,6 +17,7 @@ export interface Profile {
   rating: number;
   ratingCount: number;
   isWorker: boolean;
+  portfolio?: string[];
   createdAt: any;
   updatedAt: any;
 }
