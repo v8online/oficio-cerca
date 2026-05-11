@@ -3,11 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from 'react';
 import { 
   onAuthStateChanged, 
@@ -17,6 +12,8 @@ import {
   doc, 
   getDoc, 
   setDoc, 
+  addDoc,
+  updateDoc,
   collection, 
   query, 
   where, 
@@ -42,6 +39,9 @@ import {
   ArrowLeft,
   Briefcase,
   MessageCircle,
+  CheckCircle,
+  Plus,
+  Camera,
   X
 } from 'lucide-react';
 
@@ -131,6 +131,10 @@ export default function App() {
   // Selected Worker
   const [selectedWorker, setSelectedWorker] = useState<Profile | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -138,6 +142,8 @@ export default function App() {
   // Edit Profile Local State
   const [editDept, setEditDept] = useState('');
   const [editCity, setEditCity] = useState('');
+  const [editPortfolio, setEditPortfolio] = useState<string[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -152,10 +158,72 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  const handleLeaveReview = async () => {
+    if (!user || !selectedWorker) return;
+    if (rating === 0) return;
+    if (!comment.trim()) return;
+
+    setSubmittingReview(true);
+    try {
+      const reviewData: Review = {
+        workerId: selectedWorker.userId,
+        clientId: user.uid,
+        clientName: user.displayName || 'Usuario',
+        clientPhoto: user.photoURL || '',
+        rating,
+        comment,
+        createdAt: serverTimestamp(),
+      };
+
+      // Add to subcollection
+      const reviewsRef = collection(db, 'profiles', selectedWorker.userId, 'reviews');
+      await addDoc(reviewsRef, reviewData);
+
+      // Update worker stats
+      const newCount = (selectedWorker.ratingCount || 0) + 1;
+      const currentRating = selectedWorker.ratingCount === 0 ? rating : selectedWorker.rating;
+      const updatedRating = selectedWorker.ratingCount === 0 ? rating : ((selectedWorker.rating * selectedWorker.ratingCount) + rating) / newCount;
+
+      const workerRef = doc(db, 'profiles', selectedWorker.userId);
+      await updateDoc(workerRef, {
+        rating: updatedRating,
+        ratingCount: newCount,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update local state
+      setSelectedWorker({
+        ...selectedWorker,
+        rating: updatedRating,
+        ratingCount: newCount
+      });
+      
+      // Refresh reviews
+      const q = query(
+        reviewsRef,
+        orderBy('createdAt', 'desc'),
+        limit(10)
+      );
+      const snap = await getDocs(q);
+      const newReviews: Review[] = [];
+      snap.forEach(d => newReviews.push({ id: d.id, ...d.data() } as Review));
+      setReviews(newReviews);
+
+      setShowReviewModal(false);
+      setRating(0);
+      setComment('');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `profiles/${selectedWorker?.userId}/reviews`, auth);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   useEffect(() => {
     if (profile && view === 'EDIT_PROFILE') {
       setEditDept(profile.department || '');
       setEditCity(profile.city || '');
+      setEditPortfolio(profile.portfolio || []);
     }
   }, [profile, view]);
 
@@ -224,9 +292,8 @@ export default function App() {
   };
 
   const selectWorker = async (worker: Profile) => {
-    // Si no está logueado, redirigir al login
     if (!user) {
-      setView('LOGIN');
+      loginWithGoogle();
       return;
     }
     setSelectedWorker(worker);
@@ -254,6 +321,7 @@ export default function App() {
       const docRef = doc(db, 'profiles', user.uid);
       const finalData = {
         ...updatedData,
+        portfolio: editPortfolio,
         updatedAt: serverTimestamp(),
       };
       await setDoc(docRef, finalData, { merge: true });
@@ -264,11 +332,26 @@ export default function App() {
     }
   };
 
-  // Helper: obtener nombre a mostrar según estado de login
-  const getDisplayName = (name: string) => {
-    if (user) return name;
-    // Solo mostrar el primer nombre si no está logueado
-    return name ? name.split(' ')[0] : name;
+  const handlePortfolioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    if (editPortfolio.length + files.length > 5) {
+      alert("Solo podés subir hasta 5 fotos en tu portafolio.");
+      return;
+    }
+
+    Array.from(files).forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditPortfolio(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removePortfolioImage = (index: number) => {
+    setEditPortfolio(prev => prev.filter((_, i) => i !== index));
   };
 
   if (loading) {
@@ -358,25 +441,65 @@ export default function App() {
                 </div>
 
                 <div className="relative hidden lg:block">
-                  <div className="absolute -top-12 -right-12 w-64 h-64 bg-brand-accent/10 rounded-full blur-3xl"></div>
-                  <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-brand-cta/10 rounded-full blur-3xl"></div>
-                  <img 
-                    src="https://images.unsplash.com/photo-1581578731548-c64695cc6954?auto=format&fit=crop&q=80&w=1200" 
-                    alt="Trabajador Profesional" 
-                    className="relative rounded-3xl shadow-2xl z-10 w-full aspect-[4/5] object-cover"
-                  />
-                  <div className="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-xl z-20 flex items-center gap-4">
-                    <div className="flex -space-x-4">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 overflow-hidden">
-                          <img src={`https://i.pravatar.cc/100?u=${i}`} alt="Avatar" />
-                        </div>
-                      ))}
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-brand-primary">+500 Profesionales</div>
-                      <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Verificados en Córdoba</div>
-                    </div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-brand-cta/5 to-white rounded-3xl -z-10 shadow-inner"></div>
+                  
+                  {/* Stylized background simulation for the map */}
+                  <div className="absolute inset-0 opacity-10 pointer-events-none rounded-3xl overflow-hidden">
+                    <img 
+                      src="https://images.unsplash.com/photo-1526778545894-cd306ee498ec?auto=format&fit=crop&q=80&w=1200" 
+                      alt="Mapa Decorativo"
+                      className="w-full h-full object-cover grayscale brightness-125"
+                    />
+                  </div>
+
+                  {/* Floating Elements */}
+                  <div className="relative h-[600px] w-full">
+                    <motion.div 
+                      animate={{ y: [0, -20, 0], rotate: [0, 1, 0] }}
+                      transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                      className="absolute top-10 left-10 p-5 bg-white rounded-2xl shadow-xl border border-slate-100 z-20 flex items-center gap-4"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-500">
+                        <CheckCircle size={28} />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-slate-800">Verificación 100%</div>
+                        <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Trabajo Garantizado</div>
+                      </div>
+                    </motion.div>
+
+                    <motion.div 
+                      animate={{ y: [0, 15, 0], x: [0, 10, 0] }}
+                      transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                      className="absolute top-1/4 right-0 p-4 bg-white rounded-2xl shadow-xl border border-slate-100 z-20"
+                    >
+                      <div className="flex gap-2 mb-3">
+                        {[4, 5, 6].map(i => (
+                          <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-100 overflow-hidden shadow-sm">
+                            <img src={`https://i.pravatar.cc/100?u=w${i}`} alt="Professional" />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-xs font-bold text-slate-700">Más de 50 Oficios</div>
+                    </motion.div>
+
+                    <motion.div 
+                      animate={{ y: [0, -10, 0] }}
+                      transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                      className="absolute bottom-10 left-6 right-6 bg-white/95 backdrop-blur-md p-6 rounded-3xl shadow-2xl z-30 flex items-center gap-5 border border-white/50"
+                    >
+                      <div className="flex -space-x-4">
+                        {[1, 2, 3].map(i => (
+                          <div key={i} className="w-14 h-14 rounded-full border-4 border-white bg-slate-200 overflow-hidden shadow-md transform hover:scale-110 transition-transform cursor-pointer">
+                            <img src={`https://i.pravatar.cc/100?u=hero${i}`} alt="Verified Worker" />
+                          </div>
+                        ))}
+                      </div>
+                      <div>
+                        <div className="text-xl font-black text-brand-primary tracking-tight">+500 Profesionales</div>
+                        <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">Verificados en Córdoba</div>
+                      </div>
+                    </motion.div>
                   </div>
                 </div>
               </section>
@@ -467,7 +590,9 @@ export default function App() {
 
                       <div className="space-y-4">
                         <div>
-                          <h3 className="font-display font-bold text-xl text-brand-primary truncate">{getDisplayName(worker.name)}</h3>
+                          <h3 className="font-display font-bold text-xl text-brand-primary truncate">
+                            {user ? worker.name : worker.name.split(' ')[0]}
+                          </h3>
                           <div className="flex items-center gap-1 text-slate-400 text-sm mt-0.5">
                             <MapPin size={14} />
                             <span>{worker.city}, {worker.department}</span>
@@ -595,6 +720,26 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Portfolio Gallery */}
+                      {selectedWorker.portfolio && selectedWorker.portfolio.length > 0 && (
+                        <div id="portfolio-gallery">
+                          <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Portafolio de Trabajos</h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            {selectedWorker.portfolio.map((img, idx) => (
+                              <motion.div 
+                                key={idx}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => setSelectedImage(img)}
+                                className="aspect-square rounded-2xl overflow-hidden cursor-pointer shadow-md border border-slate-100"
+                              >
+                                <img src={img} alt={`Trabajo ${idx + 1}`} className="w-full h-full object-cover" />
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Reviews List */}
                       <div>
                         <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6">Valoraciones ({selectedWorker.ratingCount})</h4>
@@ -643,17 +788,26 @@ export default function App() {
                           </div>
                         </div>
                         <div className="pt-4">
-                          <button className="w-full py-4 border-2 border-brand-cta text-brand-cta rounded-2xl font-bold hover:bg-brand-cta hover:text-white transition-all active:scale-95 flex items-center justify-center gap-2">
-                            <ExternalLink size={18} />
-                            Ver Portfolio
-                          </button>
+                        <button 
+                          onClick={() => {
+                            const gallery = document.getElementById('portfolio-gallery');
+                            if (gallery) gallery.scrollIntoView({ behavior: 'smooth' });
+                          }}
+                          className="w-full py-4 border-2 border-brand-cta text-brand-cta rounded-2xl font-bold hover:bg-brand-cta hover:text-white transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <Camera size={18} />
+                          Ver Portfolio
+                        </button>
                         </div>
                       </div>
                       
                       <div className="bg-brand-primary text-white p-6 rounded-3xl space-y-4">
                         <h5 className="font-bold">¿Trabajaste con {selectedWorker.name}?</h5>
                         <p className="text-white/60 text-sm">Tu opinión ayuda a otros cordobeses a elegir mejor.</p>
-                        <button className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold transition-all text-sm">
+                        <button 
+                          onClick={() => setShowReviewModal(true)}
+                          className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold transition-all text-sm"
+                        >
                           Dejar una reseña
                         </button>
                       </div>
@@ -807,6 +961,37 @@ export default function App() {
                       placeholder="Contanos sobre tu experiencia, herramientas, forma de trabajo..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-brand-cta/20 focus:border-brand-cta transition-all"
                     />
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Portafolio de Fotos (Máx. 5)</label>
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
+                      {editPortfolio.map((img, idx) => (
+                        <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200">
+                          <img src={img} className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => removePortfolioImage(idx)}
+                            className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      {editPortfolio.length < 5 && (
+                        <label className="aspect-square rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:border-brand-cta hover:text-brand-cta transition-all cursor-pointer bg-slate-50">
+                          <Plus size={24} />
+                          <span className="text-[10px] font-bold mt-1 uppercase">Subir</span>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            multiple 
+                            className="hidden" 
+                            onChange={handlePortfolioChange} 
+                          />
+                        </label>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1032,6 +1217,127 @@ export default function App() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+      
+      {/* Full-screen Image Viewer (Lightbox) */}
+      <AnimatePresence>
+        {selectedImage && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 p-4 md:p-12">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedImage(null)}
+              className="absolute inset-0 cursor-zoom-out"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative max-w-5xl w-full max-h-full flex items-center justify-center"
+            >
+              <img 
+                src={selectedImage} 
+                alt="Fullscreen Preview" 
+                className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
+              />
+              <button 
+                onClick={() => setSelectedImage(null)}
+                className="absolute -top-12 right-0 text-white bg-white/10 hover:bg-white/20 p-2 rounded-full backdrop-blur-md transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Review Modal */}
+      <AnimatePresence>
+        {showReviewModal && selectedWorker && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowReviewModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl font-display font-bold text-brand-primary">Dejar una Reseña</h3>
+                  <button 
+                    onClick={() => setShowReviewModal(false)}
+                    className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                  >
+                    <X size={20} className="text-slate-400" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-brand-accent">
+                    <img src={selectedWorker.photo} alt={selectedWorker.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-brand-primary tracking-tight">{selectedWorker.name}</div>
+                    <div className="text-xs text-slate-500">{selectedWorker.occupations.join(', ')}</div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tu Calificación</label>
+                    <div className="flex gap-2 justify-center py-2">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <button 
+                          key={s}
+                          type="button"
+                          onClick={() => setRating(s)}
+                          className="p-1 transition-transform active:scale-90"
+                        >
+                          <Star 
+                            size={36} 
+                            className={cn(
+                              "transition-all duration-200",
+                              s <= rating ? "fill-brand-accent text-brand-accent scale-110" : "text-slate-200 hover:text-slate-300"
+                            )} 
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tu Comentario</label>
+                    <textarea 
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      placeholder="Contanos cómo fue tu experiencia..."
+                      className="w-full h-32 bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-brand-cta/20 focus:border-brand-cta transition-all resize-none"
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleLeaveReview}
+                  disabled={submittingReview || rating === 0 || !comment.trim()}
+                  className="w-full py-4 bg-brand-cta text-white rounded-2xl font-bold shadow-xl shadow-brand-cta/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+                >
+                  {submittingReview ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : 'Publicar Reseña'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
