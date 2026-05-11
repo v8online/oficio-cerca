@@ -18,6 +18,7 @@
         "rating": { "type": "number", "description": "Average rating." },
         "ratingCount": { "type": "integer", "description": "Total number of ratings." },
         "isWorker": { "type": "boolean", "description": "Whether the user offers services." },
+        "portfolio": { "type": "array", "description": "List of portfolio image URLs." },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
