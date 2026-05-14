@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://oficio-cerca.vercel.app/sitemap.xml
