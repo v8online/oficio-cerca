@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "Profile": {
+      "title": "User Profile",
+      "description": "Stores both worker and client profile information.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The unique ID of the user." },
+        "name": { "type": "string", "description": "Full name of the user." },
+        "photo": { "type": "string", "description": "URL to profile photo." },
+        "occupations": { "type": "array", "description": "List of professions or trades." },
+        "department": { "type": "string", "description": "Department in Córdoba." },
+        "city": { "type": "string", "description": "Specific city or locality." },
+        "experience": { "type": "integer", "description": "Years of experience." },
+        "description": { "type": "string", "description": "Short bio or service description." },
+        "priceRange": { "type": "string", "description": "Rough indication of price (entry level, mid, high)." },
+        "phone": { "type": "string", "description": "Contact phone number." },
+        "rating": { "type": "number", "description": "Average rating." },
+        "ratingCount": { "type": "integer", "description": "Total number of ratings." },
+        "isWorker": { "type": "boolean", "description": "Whether the user offers services." },
+        "portfolio": { "type": "array", "description": "List of portfolio image URLs." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "isWorker"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A review given to a worker by a client.",
+      "type": "object",
+      "properties": {
+        "workerId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientPhoto": { "type": "string" },
+        "rating": { "type": "integer" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["workerId", "clientId", "rating", "comment"]
+    }
+  },
+  "firestore": {
+    "/profiles/{userId}": {
+      "schema": "Profile",
+      "description": "Public profiles for all users."
+    },
+    "/profiles/{userId}/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Reviews associated with a specific worker profile."
+    }
+  }
+}

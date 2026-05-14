@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helpers
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // Profiles validation
+    function isValidProfile(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.isWorker is bool &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 1000)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
+             (!('city' in data) || (data.city is string && data.city.size() <= 100)) &&
+             (!('department' in data) || (data.department is string && data.department.size() <= 100)) &&
+             (!('portfolio' in data) || (data.portfolio is list && data.portfolio.size() <= 5));
+    }
+
+    match /profiles/{userId} {
+      allow read: if true;
+      allow create: if isOwner(userId) && isValidProfile(incoming()) && 
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt == request.time;
+      allow update: if isOwner(userId) && isValidProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().updatedAt == request.time;
+    }
+
+    // Reviews validation
+    function isValidReview(data) {
+      return data.workerId is string && data.workerId.size() <= 128 &&
+             data.clientId is string && data.clientId.size() <= 128 &&
+             data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+             data.comment is string && data.comment.size() > 0 && data.comment.size() <= 500;
+    }
+
+    match /profiles/{userId}/reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidReview(incoming()) &&
+                       incoming().clientId == request.auth.uid &&
+                       incoming().workerId == userId &&
+                       incoming().createdAt == request.time;
+      // Reviews are usually immutable or owner-editable
+      allow update: if isOwner(incoming().clientId) && isValidReview(incoming()) &&
+                       incoming().clientId == existing().clientId &&
+                       incoming().workerId == existing().workerId;
+      allow delete: if isOwner(existing().clientId);
+    }
+  }
+}
