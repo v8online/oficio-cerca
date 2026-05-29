@@ -555,6 +555,84 @@ export default function App() {
                   ))}
                 </div>
               </section>
+
+              {/* Info and FAQs Section */}
+              <section className="w-full bg-slate-50 py-16 border-b border-slate-100">
+                <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12">
+                  
+                  {/* Left Column: Diferencia Trabajo y Oficio */}
+                  <div className="space-y-6 text-left">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 text-xs font-bold uppercase tracking-wider">
+                      <Briefcase size={12} />
+                      Conceptos Útiles
+                    </div>
+                    <h2 className="text-3xl font-display font-bold text-brand-primary tracking-tight">
+                      ¿Diferencia entre Trabajo y Oficio?
+                    </h2>
+                    <p className="text-slate-600 leading-relaxed">
+                      En <strong>OficioCerca</strong> conectamos a profesionales de todas las áreas con personas que necesitan su ayuda en Córdoba. Es importante entender en qué se diferencian para encontrar exactamente lo que buscas:
+                    </p>
+                    
+                    <div className="grid gap-4 mt-6">
+                      <div className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                        <h3 className="font-bold text-lg text-brand-primary mb-1">💼 El Trabajo Tradicional</h3>
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                          Suele ser en relación de dependencia, con horarios preestablecidos y una estructura corporativa tradicional (como empleos administrativos, atención o soporte técnico).
+                        </p>
+                      </div>
+                      
+                      <div className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm border-l-4 border-l-brand-accent">
+                        <h3 className="font-bold text-lg text-brand-primary mb-1">🛠️ El Oficio y Servicio Técnico</h3>
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                          Es una labor técnica o manual, generalmente autónoma o independiente (como plomeros, electricistas, pintores, gasistas matriculados y mecánicos) donde ofreces tus servicios directo al cliente final.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Right Column: Preguntas Frecuentes */}
+                  <div className="space-y-6 text-left">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-accent/10 text-brand-accent text-xs font-bold uppercase tracking-wider">
+                      <Clock size={12} />
+                      Respuestas Rápidas
+                    </div>
+                    <h2 className="text-3xl font-display font-bold text-brand-primary tracking-tight">
+                      Preguntas Frecuentes (FAQ)
+                    </h2>
+                    
+                    <div className="space-y-4">
+                      <div className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                        <h4 className="font-bold text-base text-brand-primary mb-2">
+                          ¿Qué tipo de trabajos/oficios puedo ofrecer en la plataforma?
+                        </h4>
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                          Puedes registrarte en cualquiera de nuestras más de 60 categorías de oficios activos en Córdoba: desde construcciones, instalaciones eléctricas, hasta servicios de estética, asistencia a domicilio y educación particular.
+                        </p>
+                      </div>
+                      
+                      <div className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                        <h4 className="font-bold text-base text-brand-primary mb-2">
+                          ¿Cómo registrar mi oficio gratis para conseguir clientes?
+                        </h4>
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                          Solo debes hacer clic en <strong>Ingresar</strong>, autenticarte con tu cuenta de Google y activar la casilla <strong>"Quiero ofrecer mis servicios"</strong> en tu perfil. Rellena tus datos de contacto, localidad y especialidades para aparecer en el buscador.
+                        </p>
+                      </div>
+
+                      <div className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                        <h4 className="font-bold text-base text-brand-primary mb-2">
+                          ¿Qué edad necesito para ofrecer servicios en Córdoba?
+                        </h4>
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                          Para ofrecer servicios técnicos a domicilio de manera independiente, debes ser mayor de edad en Argentina (18 años) o contar con la debida supervisión y autorización familiar correspondiente si realizas tareas auxiliares menores.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                </div>
+              </section>
+
             </motion.div>
           )}
 
